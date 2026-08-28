@@ -14,15 +14,15 @@ Analysis code starts at Figure 2 because Figure 1 is a study workflow diagram. T
 | Figure 5A-F | GSE163154 correlation analyses | `03_External_Transcriptome_Proteome.R` |
 | Figure 6A-J | GSE163154 correlation/HIF1A analyses plus internal proteomic validation and PPI | `03_External_Transcriptome_Proteome.R` |
 | Figure 7A-F, H-L | LASSO, clinical model, ROC, DCA, risk score, nomogram, calibration and performance metrics | `03_External_Transcriptome_Proteome.R` |
-| Figure 7G | Fully nested LOOCV validation | `05_Revision_Supplementary.R` |
+| Figure 7G | Fully nested LOOCV validation | `05_Supplementary_Analysis.R` |
 | Figure 8A-J | GSE43292 and GSE28829 external validation | `03_External_Transcriptome_Proteome.R` |
 | Figure 9 | Spatial transcriptomics colocalization and proximity analysis | `04_Spatial_Transcriptomics.R` |
 | Supplementary Figure 1A-J | GSE253903 external single-cell validation | `02_External_SingleCell.R` |
 | Supplementary Figure 2A-H | GSE163154 GO, KEGG, HALLMARK, glycolysis and hypoxia enrichment | `03_External_Transcriptome_Proteome.R` |
 | Supplementary Figure 3A-J | GSE100927 carotid and femoral validation | `03_External_Transcriptome_Proteome.R` |
 | Supplementary Figure 4A-E | GSE100927 infra-popliteal validation | `03_External_Transcriptome_Proteome.R` |
-| Supplementary Figure 5A-F | ACKR1/glycolysis redraw and internal single-cell CellChat | `05_Revision_Supplementary.R` |
-| Supplementary Figure 6A-H | Revision model stability, composition adjustment, CD8 proportion, key-gene and bulk-signature validation | `05_Revision_Supplementary.R` |
+| Supplementary Figure 5A-F | ACKR1/glycolysis redraw and internal single-cell CellChat | `05_Supplementary_Analysis.R` |
+| Supplementary Figure 6A-H | Revision model stability, composition adjustment, CD8 proportion, key-gene and bulk-signature validation | `05_Supplementary_Analysis.R` |
 
 ## Privacy redaction
 
