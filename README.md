@@ -1,18 +1,18 @@
-# Reorganized analysis scripts (revision figure order)
+# Analysis scripts for the ACKR1 study
 
-R version used for syntax checking: **R 4.6.1**.
+This repository contains the analysis scripts for the manuscript and revision supplementary figures, including Supplementary Figures 7 and 8. Analyses start at Figure 2 because Figure 1 is a study workflow diagram. The graphical abstract is not an R-generated analysis figure.
 
-Before running the scripts, replace each `PATH_TO_DATA/...` placeholder with the directory containing the corresponding input data. For internal single-cell and spatial data, make the local sample-folder names agree with the anonymized `Sample_XXXX##` mapping (or edit that mapping to match your locally stored files). The scripts are provided in the figure order shown below; outputs are written to the subdirectories specified in each script.
+**R version used for syntax checking:** R 4.6.1. 
 
-Analysis code starts at Figure 2 because Figure 1 is a study workflow diagram. The graphical abstract is not an R-generated analysis figure.
+## Figure-to-script map
 
-| Current figure | Content | Script |
+| Figure | Analysis | Script |
 |---|---|---|
 | Figure 2A-H | Internal single-cell overview, endothelial subtype validation, differential analysis, GO and KEGG | `01_Internal_SingleCell.R` |
 | Figure 3A-J | Internal single-cell mechanism, metabolism, immune and clinical-association analyses | `01_Internal_SingleCell.R` |
 | Figure 4A-G | GSE163154 differential expression, heatmap and core-gene/pathway expression | `03_External_Transcriptome_Proteome.R` |
 | Figure 5A-F | GSE163154 correlation analyses | `03_External_Transcriptome_Proteome.R` |
-| Figure 6A-J | GSE163154 correlation/HIF1A analyses plus internal proteomic validation and PPI | `03_External_Transcriptome_Proteome.R` |
+| Figure 6A-J | GSE163154 correlation/HIF1A analyses, internal proteomic validation and PPI | `03_External_Transcriptome_Proteome.R` |
 | Figure 7A-F, H-L | LASSO, clinical model, ROC, DCA, risk score, nomogram, calibration and performance metrics | `03_External_Transcriptome_Proteome.R` |
 | Figure 7G | Fully nested LOOCV validation | `05_Supplementary_Analysis.R` |
 | Figure 8A-J | GSE43292 and GSE28829 external validation | `03_External_Transcriptome_Proteome.R` |
@@ -23,7 +23,20 @@ Analysis code starts at Figure 2 because Figure 1 is a study workflow diagram. T
 | Supplementary Figure 4A-E | GSE100927 infra-popliteal validation | `03_External_Transcriptome_Proteome.R` |
 | Supplementary Figure 5A-F | ACKR1/glycolysis redraw and internal single-cell CellChat | `05_Supplementary_Analysis.R` |
 | Supplementary Figure 6A-H | Revision model stability, composition adjustment, CD8 proportion, key-gene and bulk-signature validation | `05_Supplementary_Analysis.R` |
+| Supplementary Figure 7A-C | GSE43292 within-patient paired comparisons and conditional logistic regression | `05_Supplementary_Analysis.R` |
+| Supplementary Figure 7D-E | Internal proteomic key proteins and KEGG pathways before and after clinical adjustment | `05_Supplementary_Analysis.R` |
+| Supplementary Figure 7F | GSE163154 nested LOOCV calibration and bootstrap confidence intervals | `05_Supplementary_Analysis.R` |
+| Supplementary Figure 7G | Proteome-wide effect sizes before and after clinical adjustment | `05_Supplementary_Analysis.R` |
+| Supplementary Figure 8A-B | GSE163154 model features and CD8 cytotoxicity-score genes | `05_Supplementary_Analysis.R` |
 
-## Privacy redaction
+## Running the analyses
 
-Internal sample and patient identifiers were replaced with `XXXX`-style placeholders while preserving the original sample pairing and group structure. Spatial-transcriptomics sample labels were also replaced with anonymized placeholders. Local data paths were replaced with `PATH_TO_DATA` placeholders, so the input directories must be set locally before execution. Public GEO accession numbers (for example, GSE and GSM identifiers) were retained because they identify publicly available datasets required for reproducibility. The optional STRING network request uses a public endpoint and contains no embedded credential. No API tokens, database credentials, or server IP addresses are included.
+Replace each `PATH_TO_DATA/...` placeholder with the local path to the corresponding input data, and align local sample labels with the `XXXX`-style placeholders while preserving pairing and group membership. Install the packages required by each script and run sections in their listed order; later sections may depend on earlier outputs. Record the R and package versions using `sessionInfo()`.
+
+Internal single-cell, spatial, proteomic and clinical inputs are not included. Public GEO accession numbers are retained for reproducibility. Chinese input filenames, worksheet names and column names are retained as data-reading keys and must match the local input files. Some sections install packages, download public data or query STRING/KEGG; results depend on the input files, package and database versions, and service availability.
+
+## Privacy and responsible use
+
+Internal sample and patient labels have been replaced with `XXXX`-style placeholders, and local data paths with `PATH_TO_DATA/...`. These replacements do not anonymize runtime inputs or outputs. Users are responsible for obtaining required data-access and ethics approvals and reviewing all outputs before sharing. Do not publish patient records, identifier mappings, credentials, private datasets, unredacted logs or R session history, including through GitHub issues or pull requests. 
+
+These scripts support research and peer review and have not been validated for clinical use. Cite the associated study and the datasets and software used, and record the repository commit or release. Code licensing is governed by the repository's `LICENSE` file; third-party software and datasets remain subject to their respective terms. A code license does not authorize access to or redistribution of patient data.
