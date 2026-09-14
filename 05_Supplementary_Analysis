@@ -1,5 +1,9 @@
-# Supplementary Figures 5-6: ACKR1 revision supplementary analyses (English; current revision order)
-# Corresponds to current Supplementary Figure 5 (ACKR1/glycolysis/internal single-cell communication) and Supplementary Figure 6 (revision model and supplementary validation).
+# Supplementary Figures 5-8 and Figure 7G
+#
+# Public-use notice: This script is released for research reproducibility and peer review.
+# It is not a clinical device, diagnostic procedure, or substitute for independent validation.
+# Replace PATH_TO_DATA placeholders only with data for which you have lawful access.
+# Do not publish runtime data, outputs, logs, or objects containing identifiable information.
 # Supplementary Figure 5A-D: Final ACKR1/glycolysis redraw
 
 suppressMessages({
@@ -17,18 +21,18 @@ if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 col_C7  <- "#272E6A"
 col_C11 <- "#D51F26"
 
-message(">>> 正在加载内皮细胞亚群 (C7 & C11)...")
+message("Loading endothelial clusters C7 and C11.")
 sc_Endo <- readRDS("Endothelial_Subpopulation_C7_C11.rds")
 DefaultAssay(sc_Endo) <- "RNA"
 
 umap_name <- grep("umap", Reductions(sc_Endo), ignore.case = TRUE, value = TRUE)[1]
-if (is.na(umap_name)) stop("对象里找不到 UMAP 降维，请先 RunUMAP()。")
+if (is.na(umap_name)) stop("UMAP reduction was not found. Run RunUMAP() before this section.")
 
 sc_Endo$seurat_clusters <- factor(as.character(sc_Endo$seurat_clusters),
                                   levels = c("7", "11"))
 Idents(sc_Endo) <- "seurat_clusters"
 
-message(">>> 正在绘制小提琴图...")
+message("Plotting violin distributions.")
 
 vln_df <- data.frame(
   cluster = sc_Endo$seurat_clusters,
@@ -62,7 +66,7 @@ p_vln <- ggplot(vln_df, aes(x = cluster, y = expr, fill = cluster)) +
   )
 
 
-message(">>> 正在绘制 UMAP FeaturePlot...")
+message("Plotting UMAP feature expression.")
 
 emb <- as.data.frame(Embeddings(sc_Endo, umap_name))[, 1:2]
 colnames(emb) <- c("UMAP_1", "UMAP_2")
@@ -104,7 +108,7 @@ png_path <- file.path(out_dir, "ACKR1_Violin_UMAP.png")
 ggsave(pdf_path, p_final, width = 12, height = 5.2)
 ggsave(png_path, p_final, width = 12, height = 5.2, dpi = 600)
 
-message("\n>>> 完成！已保存：\n    ", pdf_path, "\n    ", png_path)
+message("\nOutputs saved:\n    ", pdf_path, "\n    ", png_path)
 
 
 suppressMessages({
@@ -124,13 +128,13 @@ if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 col_C7  <- "#272E6A"
 col_C11 <- "#D51F26"
 
-message(">>> 正在加载内皮细胞亚群 (C7 & C11)...")
+message("Loading endothelial clusters C7 and C11.")
 sc_Endo <- readRDS("Endothelial_Subpopulation_C7_C11.rds")
 DefaultAssay(sc_Endo) <- "RNA"
 Idents(sc_Endo) <- "seurat_clusters"
 obj_genes <- rownames(sc_Endo)
 
-message(">>> 正在提取糖酵解基因集...")
+message("Retrieving glycolysis gene sets.")
 
 m_H <- msigdbr(species = "Homo sapiens", category = "H")
 glyco_hallmark <- m_H %>%
@@ -154,7 +158,7 @@ set_go       <- present(glyco_go)
 set_core     <- present(core_glyco)
 
 if (length(set_go) < 5) {
-  message(sprintf("   ! GO 集合交集仅 %d 个基因，第二面板改用手工核心糖酵解集。", length(set_go)))
+  message(sprintf("Only %d GO genes are available; using the predefined core glycolysis set for the second panel.", length(set_go)))
   set2       <- set_core
   set2_label <- "Glycolysis (Core Enzymes)"
 } else {
@@ -162,12 +166,12 @@ if (length(set_go) < 5) {
   set2_label <- "Glycolysis (GO:0006096)"
 }
 
-message(sprintf("   - HALLMARK 交集: %d 基因；第二集 (%s) 交集: %d 基因",
+message(sprintf("HALLMARK overlap: %d genes; second set (%s): %d genes.",
                 length(set_hallmark), set2_label, length(set2)))
 
 score_set <- function(obj, genes, name) {
   if (length(genes) < 3) {
-    message("   ! ", name, " 可用基因不足 3 个，已跳过。")
+    message("   ! ", name, " has fewer than three available genes; skipped.")
     return(NULL)
   }
   obj <- AddModuleScore(obj, features = list(genes), name = name,
@@ -175,7 +179,7 @@ score_set <- function(obj, genes, name) {
   obj[[paste0(name, "1")]][, 1]
 }
 
-message(">>> 正在计算糖酵解模块打分...")
+message("Calculating glycolysis module scores.")
 sc_HALLMARK <- score_set(sc_Endo, set_hallmark, "Glyco_HALLMARK")
 sc_SET2     <- score_set(sc_Endo, set2,         "Glyco_SET2")
 
@@ -183,12 +187,12 @@ score_df <- data.frame(Cluster = factor(Idents(sc_Endo), levels = c("7", "11")))
 if (!is.null(sc_HALLMARK)) score_df$Glyco_HALLMARK <- sc_HALLMARK
 if (!is.null(sc_SET2))     score_df$Glyco_SET2     <- sc_SET2
 
-cat("\n================ 糖酵解模块打分统计 (C11 vs C7) ================\n")
+cat("\nGlycolysis module-score statistics (C11 vs C7):\n")
 for (col in intersect(c("Glyco_HALLMARK", "Glyco_SET2"), colnames(score_df))) {
   p   <- wilcox.test(score_df[[col]] ~ score_df$Cluster)$p.value
   m7  <- median(score_df[[col]][score_df$Cluster == "7"],  na.rm = TRUE)
   m11 <- median(score_df[[col]][score_df$Cluster == "11"], na.rm = TRUE)
-  cat(sprintf("%-16s | 中位数 C7 = %.4f, C11 = %.4f | Wilcoxon P = %.3g\n",
+  cat(sprintf("%-16s | Median C7 = %.4f, C11 = %.4f | Wilcoxon P = %.3g\n",
               col, m7, m11, p))
 }
 cat("================================================================\n\n")
@@ -252,10 +256,10 @@ work_dir <- "PATH_TO_DATA/ACKR1_single_cell"
 out_dir  <- file.path(work_dir, "06_CellChat_Communication")
 setwd(work_dir)
 
-message(">>> 1. 正在加载全局单细胞数据...")
+message("Loading integrated single-cell data.")
 sc_global <- readRDS("Plaque_Integrated_Unannotated.rds")
 
-message(">>> 2. 正在映射真实的细胞生物学名称并合并同类项...")
+message("Mapping cell types and merging equivalent annotations.")
 cell_type_mapping <- c(
   "0"  = "T cells",
   "1"  = "NKT cells",
@@ -284,15 +288,15 @@ Idents(sc_global) <- "CellType"
 data.input <- GetAssayData(sc_global, assay = "RNA", slot = "data")
 meta <- sc_global@meta.data
 
-message(">>> 3. 正在构建 CellChat 对象...")
+message("Creating CellChat object.")
 cellchat <- createCellChat(object = data.input, meta = meta, group.by = "CellType")
 
-message(">>> 4. 正在加载 CellChat 分泌型数据库...")
+message("Loading the CellChat secreted-signaling database.")
 CellChatDB <- CellChatDB.human
 CellChatDB.use <- subsetDB(CellChatDB, search = "Secreted Signaling")
 cellchat@DB <- CellChatDB.use
 
-message(">>> 5. 正在进行细胞通讯概率计算 (可能需要几分钟)...")
+message("Estimating communication probabilities.")
 cellchat <- subsetData(cellchat)
 cellchat <- identifyOverExpressedGenes(cellchat)
 cellchat <- identifyOverExpressedInteractions(cellchat)
@@ -302,9 +306,9 @@ cellchat <- filterCommunication(cellchat, min.cells = 10)
 cellchat <- computeCommunProbPathway(cellchat)
 cellchat <- aggregateNet(cellchat)
 
-message("   - CellChat 基础网络构建完成！")
+message("CellChat network constructed.")
 
-message(">>> 6. 正在绘制 ACKR1+ ECs 专属招募配受体气泡图...")
+message("Plotting ligand-receptor signals from ACKR1-positive endothelial cells.")
 
 all_celltypes <- levels(cellchat@idents)
 target_celltypes <- all_celltypes[all_celltypes != "ACKR1+ ECs"]
@@ -336,8 +340,8 @@ X     <- as.matrix(X_mat_scaled)
 n     <- nrow(X)
 p     <- ncol(X)
 
-cat(sprintf(">>> 样本数 n=%d, 候选特征数 p=%d\n", n, p))
-cat(sprintf(">>> 事件数: IPH=%d, non-IPH=%d\n", sum(y_num==1), sum(y_num==0)))
+cat(sprintf("Sample count n=%d; candidate features p=%d\n", n, p))
+cat(sprintf("Group counts: IPH=%d; non-IPH=%d\n", sum(y_num==1), sum(y_num==0)))
 
 fit_lasso_inner <- function(Xtr, ytr) {
   cvf <- cv.glmnet(Xtr, ytr, family = "binomial", alpha = 1,
@@ -353,7 +357,7 @@ fit_lasso_inner <- function(Xtr, ytr) {
   )
 }
 
-cat("\n>>> [1] 正在运行完全嵌套 LOOCV ...\n")
+cat("\nRunning nested LOOCV.\n")
 
 nested_pred <- numeric(n)
 feature_freq <- setNames(integer(p), colnames(X))
@@ -373,24 +377,24 @@ for (i in seq_len(n)) {
 roc_nested <- roc(y_num, nested_pred, quiet = TRUE, direction = "auto")
 ci_nested  <- ci.auc(roc_nested)
 
-cat(sprintf("   - 嵌套 LOOCV AUC = %.3f (95%% CI: %.3f - %.3f)\n",
+cat(sprintf("Nested LOOCV AUC = %.3f (95%% CI: %.3f - %.3f)\n",
             as.numeric(roc_nested$auc), ci_nested[1], ci_nested[3]))
 
-cat("\n   - 各候选特征在 LOOCV 各折中被 LASSO 选中的频率（稳定性）:\n")
+cat("\nLASSO feature-selection frequencies across LOOCV folds:\n")
 ff <- sort(feature_freq, decreasing = TRUE)
 for (nm in names(ff)) {
-  cat(sprintf("       %-16s : %d / %d 折 (%.0f%%)\n",
+  cat(sprintf("%-16s : %d / %d folds (%.0f%%)\n",
               nm, ff[nm], n, 100 * ff[nm] / n))
 }
 
-cat("\n>>> [2] 正在运行 Bootstrap 乐观度校正 (B=1000) ...\n")
+cat("\nRunning bootstrap optimism correction (B=1000).\n")
 
 B <- 1000
 
 app_model <- fit_lasso_inner(X, y_num)
 app_pred  <- app_model$predict_fun(X)
 apparent_auc <- as.numeric(roc(y_num, app_pred, quiet = TRUE, direction = "auto")$auc)
-cat(sprintf("   - Apparent AUC (乐观, 未校正) = %.3f\n", apparent_auc))
+cat(sprintf("Apparent AUC (uncorrected) = %.3f\n", apparent_auc))
 
 optimism_vec <- numeric(B)
 b_done <- 0
@@ -420,14 +424,14 @@ optimism_vec <- optimism_vec[seq_len(b_done)]
 mean_optimism  <- mean(optimism_vec, na.rm = TRUE)
 corrected_auc  <- apparent_auc - mean_optimism
 
-cat(sprintf("   - 有效 Bootstrap 次数 = %d\n", b_done))
-cat(sprintf("   - 平均乐观度 (optimism) = %.3f\n", mean_optimism))
-cat(sprintf("   - 乐观度校正后 AUC (optimism-corrected) = %.3f\n", corrected_auc))
+cat(sprintf("Valid bootstrap resamples = %d\n", b_done))
+cat(sprintf("Mean optimism = %.3f\n", mean_optimism))
+cat(sprintf("Optimism-corrected AUC = %.3f\n", corrected_auc))
 
 cat("\n============================================================\n")
-cat(" 汇总 (可直接填入回复信 XX 处)\n")
+cat("Validation summary:\n")
 cat("------------------------------------------------------------\n")
-cat(sprintf(" Apparent AUC (未校正, 乐观)        : %.3f\n", apparent_auc))
+cat(sprintf("Apparent AUC (uncorrected): %.3f\n", apparent_auc))
 cat(sprintf(" Fully nested LOOCV AUC             : %.3f (95%% CI %.3f-%.3f)\n",
             as.numeric(roc_nested$auc), ci_nested[1], ci_nested[3]))
 cat(sprintf(" Bootstrap optimism                 : %.3f\n", mean_optimism))
@@ -528,9 +532,9 @@ if (exists("feature_freq")) {
   ggsave(file.path(out_dir, "Figure9_Nested_Combined.pdf"), p_merge, width = 15, height = 6.5)
   ggsave(file.path(out_dir, "Figure9_Nested_Combined.png"), p_merge, width = 15, height = 6.5, dpi = 600)
 
-  cat(">>> 已输出: Figure9G_Nested_LOOCV_ROC / Figure9H_Feature_Stability / Figure9_Nested_Combined\n")
+  cat("Saved: Figure9G_Nested_LOOCV_ROC / Figure9H_Feature_Stability / Figure9_Nested_Combined\n")
 } else {
-  cat(">>> 未找到 feature_freq 对象，仅输出 ROC 图。请重跑嵌套 LOOCV 那段以生成 feature_freq。\n")
+  cat("feature_freq was not found; only the ROC plot was generated. Run the feature-selection section first.\n")
 }
 
 # Supplementary Figure 6B: Cell-composition adjustment and partial correlations
@@ -548,7 +552,7 @@ setwd(work_dir)
 
 sc_filtered <- readRDS("Plaque_Integrated_Unannotated.rds")
 
-message(">>> 正在为 Cluster 添加细胞类型注释...")
+message("Assigning cell-type annotations to clusters.")
 Idents(sc_filtered) <- "seurat_clusters" 
 
 cluster2celltype <- c(
@@ -586,7 +590,7 @@ pheno_gse <- pData(gset)
 
 group_gse <- ifelse(grepl("non-IPH", pheno_gse$title, ignore.case = TRUE), "non_IPH", "IPH")
 group_factor <- factor(group_gse, levels = c("non_IPH", "IPH"))
-cat(">>> 分组:", table(group_factor), "\n")
+cat("Groups:", table(group_factor), "\n")
 
 sym <- mapIds(illuminaHumanv2.db,
               keys = rownames(expr_gse),
@@ -599,7 +603,7 @@ sym <- sym[keep]
 expr_bulk <- limma::avereps(expr_sym, ID = sym)
 expr_bulk <- as.matrix(expr_bulk)
 
-cat(">>> expr_bulk 就绪:", nrow(expr_bulk), "基因 x", ncol(expr_bulk), "样本\n")
+cat("expr_bulk dimensions:", nrow(expr_bulk), " genes x ", ncol(expr_bulk), " samples\n")
 
 
 exists("sc_filtered"); exists("expr_bulk"); exists("group_factor")
@@ -622,7 +626,7 @@ lactate_genes <- c("SLC16A3","SLC16A4","SLC16A7")
 immune_genes  <- c("CD8A","GZMA","GZMB","PRF1")
 key_genes     <- c("ACKR1","CXCL12","HIF1A", glyco_genes, lactate_genes, immune_genes)
 
-message(">>> [分析一] 构建 pseudo-bulk 并在 ACKR1+ EC 内部验证 ...")
+message("Building pseudobulk profiles within ACKR1-positive endothelial cells.")
 
 DefaultAssay(sc_filtered) <- "RNA"
 counts <- GetAssayData(sc_filtered, layer = "counts")
@@ -642,7 +646,7 @@ make_pseudobulk <- function(cell_idx, genes) {
 
 idx_ackr1ec <- which(meta$seurat_clusters == "11")
 n_samp_ec <- length(unique(meta$sample[idx_ackr1ec]))
-message(sprintf("    ACKR1+ EC 覆盖 %d 个样本", n_samp_ec))
+message(sprintf("ACKR1-positive endothelial cells occur in %d samples.", n_samp_ec))
 
 pb_ec <- make_pseudobulk(idx_ackr1ec, intersect(key_genes, rownames(counts)))
 pb_ec <- pb_ec[, colSums(is.na(pb_ec)) == 0, drop = FALSE]
@@ -659,11 +663,11 @@ for (g in target_genes) {
                            data.frame(Gene=g, R=unname(ct$estimate), P=ct$p.value, n=sum(ok)))
   }
 }
-message("    ACKR1+ EC 内部 ACKR1 vs 机制分子 相关性 (pseudo-bulk, 单一细胞类型内):")
+message("Within-cell-type pseudobulk correlations:")
 print(cor_within_ec)
 write.csv(cor_within_ec, file.path(out_dir, "PseudoBulk_within_ACKR1EC_correlation.csv"), row.names=FALSE)
 
-message("\n>>> [分析二] 解卷积估计细胞比例 + 偏相关校正 ...")
+message("\nEstimating cell proportions and adjusted partial correlations.")
 
 big_map <- c(
   "0 T cells"="T","4 T cells"="T","10 T cells"="T","15 T cells"="T","1 NKT cells"="T",
@@ -693,11 +697,11 @@ props <- apply(bulk_sub, 2, function(y){
 })
 props <- t(props)
 colnames(props) <- colnames(sig_mat)
-message("    估计的平均细胞比例:")
+message("Estimated mean cell proportions:")
 print(round(colMeans(props), 3))
 write.csv(props, file.path(out_dir, "Deconvolution_cellproportions.csv"))
 
-message("\n    偏相关 (控制 EC/T/Mac 细胞比例) vs 普通相关:")
+message("\nPartial correlations adjusted for EC/T/Mac proportions versus unadjusted correlations:")
 ctrl <- as.data.frame(props[, intersect(c("EC","T","Mac","SMC"), colnames(props))])
 
 pairs_to_test <- list(
@@ -723,16 +727,16 @@ print(res_pcor)
 write.csv(res_pcor, file.path(out_dir, "PartialCorrelation_adjusted_composition.csv"), row.names=FALSE)
 
 cat("\n============================================================\n")
-cat(" 汇总：细胞组成校正结果 (可填入回复 XX 处)\n")
+cat("Cell-composition adjustment summary:\n")
 cat("------------------------------------------------------------\n")
-cat(" [A] Pseudo-bulk (仅 ACKR1+ EC 内部, 单细胞类型内相关):\n")
+cat("[A] Within-cell-type pseudobulk correlations:\n")
 for(i in seq_len(nrow(cor_within_ec))){
   cat(sprintf("     ACKR1 vs %-8s : R=%.2f, P=%.2g (n=%d)\n",
               cor_within_ec$Gene[i], cor_within_ec$R[i], cor_within_ec$P[i], cor_within_ec$n[i]))
 }
-cat("\n [B] Bulk 偏相关 (校正 EC/T/Mac 比例后):\n")
+cat("\n[B] Bulk partial correlations adjusted for EC/T/Mac proportions:\n")
 for(i in seq_len(nrow(res_pcor))){
-  cat(sprintf("     %-16s : 原始 R=%.2f(P=%.2g) -> 偏相关 R=%.2f(P=%.2g)\n",
+  cat(sprintf("%-16s : Unadjusted R=%.2f (P=%.2g) -> Partial R=%.2f (P=%.2g)\n",
               res_pcor$Pair[i], res_pcor$Raw_R[i], res_pcor$Raw_P[i],
               res_pcor$Partial_R[i], res_pcor$Partial_P[i]))
 }
@@ -841,7 +845,7 @@ colnames(score_df) <- c("CellType","Glycolysis","Hypoxia","Lactate")
 mean_tab <- score_df %>%
   group_by(CellType) %>%
   summarise(across(c(Glycolysis,Hypoxia,Lactate), mean), .groups="drop")
-cat(">>> 各细胞类型平均模块评分:\n")
+cat("Mean module scores by cell type:\n")
 print(as.data.frame(mean_tab %>% mutate(across(where(is.numeric), ~round(.,3)))))
 write.csv(mean_tab, file.path(out_dir, "CellType_Metabolic_ModuleScores.csv"), row.names=FALSE)
 
@@ -910,8 +914,8 @@ if(!"cell_type_annotated" %in% colnames(sc_filtered@meta.data)) {
 }
 
 meta <- sc_filtered@meta.data
-cat(">>> 症状分组样本数:\n"); print(table(meta$Condition))
-cat("\n>>> 细胞类型:\n"); print(table(meta$cell_type_annotated))
+cat("Sample counts by symptom group:\n"); print(table(meta$Condition))
+cat("\nCell types:\n"); print(table(meta$cell_type_annotated))
 
 cd8_label <- "2 CD8+T cells"
 meta$is_cd8 <- as.character(meta$cell_type_annotated) == cd8_label
@@ -924,7 +928,7 @@ prop_tab <- meta %>%
             cd8_pct = 100 * mean(is_cd8),
             .groups = "drop")
 
-cat("\n>>> 各样本 CD8+ 毒性 T 占比:\n")
+cat("\nCD8-positive cytotoxic T-cell proportions by sample:\n")
 print(as.data.frame(prop_tab))
 
 wt <- wilcox.test(cd8_pct ~ Condition, data = prop_tab)
@@ -937,8 +941,8 @@ cat(sprintf("    Wilcoxon P = %.3f\n", wt$p.value))
 
 sym_mean   <- summ$mean_pct[summ$Condition=="Symptomatic"]
 asym_mean  <- summ$mean_pct[summ$Condition=="Asymptomatic"]
-direction  <- ifelse(sym_mean > asym_mean, "有症状组更高(方向一致)", "有症状组更低(方向不一致)")
-cat(sprintf("    >>> 结论方向: %s (Sym=%.2f%% vs Asym=%.2f%%)\n", direction, sym_mean, asym_mean))
+direction  <- ifelse(sym_mean > asym_mean, "Higher in symptomatic group", "Lower in symptomatic group")
+cat(sprintf("Direction: %s (Sym=%.2f%% vs Asym=%.2f%%)\n", direction, sym_mean, asym_mean))
 
 prop_tab$Condition <- factor(prop_tab$Condition, levels=c("Asymptomatic","Symptomatic"))
 p <- ggplot(prop_tab, aes(x=Condition, y=cd8_pct, fill=Condition)) +
@@ -983,7 +987,7 @@ check_tab <- deg_clean %>%
   arrange(adj.P.Val)
 
 cat("========================================================\n")
-cat(" 关键基因：原始 P 值 vs FDR 校正后 adj.P.Val\n")
+cat("Key genes: nominal and FDR-adjusted P-values\n")
 cat("--------------------------------------------------------\n")
 print(as.data.frame(check_tab), row.names = FALSE)
 cat("========================================================\n")
@@ -991,20 +995,20 @@ cat("========================================================\n")
 n_total   <- nrow(check_tab)
 n_fdr_sig <- sum(check_tab$adj.P.Val < 0.05)
 n_raw_sig <- sum(check_tab$P.Value < 0.05)
-cat(sprintf("\n找到 %d 个关键基因：\n", n_total))
-cat(sprintf("  原始 P<0.05 显著: %d 个\n", n_raw_sig))
-cat(sprintf("  FDR<0.05  显著: %d 个\n", n_fdr_sig))
+cat(sprintf("\nKey genes found: %d\n", n_total))
+cat(sprintf("Nominal P<0.05: %d genes\n", n_raw_sig))
+cat(sprintf("FDR<0.05: %d genes\n", n_fdr_sig))
 
 lost <- check_tab %>% filter(P.Value < 0.05 & adj.P.Val >= 0.05)
 if(nrow(lost) > 0){
-  cat("\n>>> 以下基因原始P显著、但FDR校正后不显著（回复需如实标注）:\n")
+  cat("\nGenes significant at nominal P<0.05 but not after FDR adjustment:\n")
   print(as.data.frame(lost %>% dplyr::select(Gene, P.Value, adj.P.Val)), row.names = FALSE)
 } else {
-  cat("\n>>> 所有原始P显著的关键基因，FDR校正后依然显著。\n")
+  cat("\nAll genes significant at nominal P<0.05 remain significant after FDR adjustment.\n")
 }
 
 write.csv(check_tab, "KeyGenes_FDR_check.csv", row.names = FALSE)
-cat("\n>>> 已保存 KeyGenes_FDR_check.csv\n")
+cat("\nSaved KeyGenes_FDR_check.csv\n")
 
 
 suppressMessages({
@@ -1060,7 +1064,7 @@ sup_tab <- deg_clean %>%
     "Lactate metabolism","Lactate transport","CD8+ T cytotoxicity")),
     `FDR (adj.P)`)
 
-cat(">>> 补充表 SX 预览：\n")
+cat("Supplementary key-gene table preview:\n")
 print(as.data.frame(sup_tab), row.names = FALSE)
 
 wb <- createWorkbook()
@@ -1074,7 +1078,7 @@ saveWorkbook(wb, "Supplementary_Table_SX_KeyGenes_FDR.xlsx", overwrite = TRUE)
 
 write.csv(sup_tab, "Supplementary_Table_SX_KeyGenes_FDR.csv", row.names = FALSE)
 
-cat("\n>>> 已输出 Supplementary_Table_SX_KeyGenes_FDR.xlsx / .csv\n")
+cat("\nSaved Supplementary_Table_SX_KeyGenes_FDR.xlsx / .csv\n")
 
 
 suppressMessages({
@@ -1089,7 +1093,7 @@ DefaultAssay(sc_Endo) <- "RNA"
 
 iph_genes <- c("BLVRB", "HMOX1", "CD164")
 iph_genes <- iph_genes[iph_genes %in% rownames(sc_Endo)]
-cat(">>> 可用 IPH 标志物:", paste(iph_genes, collapse=", "), "\n\n")
+cat("Available IPH markers:", paste(iph_genes, collapse=", "), "\n\n")
 
 expr <- FetchData(sc_Endo, vars = c(iph_genes, "seurat_clusters"))
 expr$Group <- ifelse(expr$seurat_clusters == "11", "ACKR1+ EC (C11)",
@@ -1102,22 +1106,22 @@ summ <- expr %>%
                    list(mean = ~round(mean(.),3),
                         pct  = ~round(mean(.>0)*100,1)),
                    .names = "{.col}_{.fn}"), .groups="drop")
-cat(">>> ACKR1+ EC vs ACKR1- EC 的 IPH 标志物表达:\n")
+cat("IPH marker expression in ACKR1-positive and ACKR1-negative endothelial cells:\n")
 print(as.data.frame(summ), row.names = FALSE)
 
-cat("\n>>> FindMarkers (C11 vs C7) 差异检验:\n")
+cat("\nFindMarkers comparison: C11 vs C7.\n")
 mk <- FindMarkers(sc_Endo, ident.1 = "11", ident.2 = "7",
                   features = iph_genes, logfc.threshold = 0, min.pct = 0)
 mk$gene <- rownames(mk)
 print(mk[, c("gene","avg_log2FC","p_val","p_val_adj","pct.1","pct.2")])
-cat("\n   注: avg_log2FC>0 表示在 ACKR1+ EC(C11)中更高; pct.1=C11阳性率, pct.2=C7阳性率\n")
+cat("\nPositive avg_log2FC indicates higher expression in C11; pct.1 and pct.2 refer to C11 and C7, respectively.\n")
 
-cat("\n>>> 方向小结:\n")
+cat("\nDirection summary:\n")
 for(g in iph_genes){
   row <- mk[mk$gene==g, ]
-  if(nrow(row)==0){ cat(sprintf("   %s: 未检出\n", g)); next }
-  dir <- ifelse(row$avg_log2FC > 0, "ACKR1+ EC 更高", "ACKR1- EC 更高")
-  sig <- ifelse(row$p_val_adj < 0.05, "显著", "不显著")
+  if(nrow(row)==0){ cat(sprintf("%s: not detected\n", g)); next }
+  dir <- ifelse(row$avg_log2FC > 0, "Higher in ACKR1-positive endothelial cells", "Higher in ACKR1-negative endothelial cells")
+  sig <- ifelse(row$p_val_adj < 0.05, "significant", "not significant")
   cat(sprintf("   %-8s: %s (log2FC=%.2f, adj.P=%.2g, %s)\n",
               g, dir, row$avg_log2FC, row$p_val_adj, sig))
 }
@@ -1134,7 +1138,7 @@ p <- ggplot(long, aes(Group, Expr, fill=Group)) +
   theme(legend.position="none", axis.text.x=element_text(angle=20, hjust=1, face="bold"))
 ggsave("IPH_markers_ACKR1EC_vs_ACKR1negEC.png", p, width=8, height=4.5, dpi=600)
 ggsave("IPH_markers_ACKR1EC_vs_ACKR1negEC.pdf", p, width=8, height=4.5)
-cat("\n>>> 已输出图 IPH_markers_ACKR1EC_vs_ACKR1negEC\n")
+cat("\nSaved IPH_markers_ACKR1EC_vs_ACKR1negEC plots.\n")
 
 
 # Supplementary Figure 6G: ACKR1+ endothelial signature validation in bulk
@@ -1154,11 +1158,11 @@ ackr1ec_sig <- deg_results_full %>%
   arrange(desc(avg_log2FC)) %>%
   pull(gene)
 
-cat(sprintf(">>> 单细胞 ACKR1+ EC 上调特征基因数: %d\n", length(ackr1ec_sig)))
-cat("    (前20个):", paste(head(ackr1ec_sig,20), collapse=", "), "\n\n")
+cat(sprintf("Genes upregulated in single-cell ACKR1-positive endothelial cells: %d\n", length(ackr1ec_sig)))
+cat("First 20:", paste(head(ackr1ec_sig,20), collapse=", "), "\n\n")
 
 sig_in_bulk <- intersect(ackr1ec_sig, rownames(expr_bulk))
-cat(sprintf(">>> 其中在 bulk 中可检测到的: %d 个\n", length(sig_in_bulk)))
+cat(sprintf("Genes detectable in bulk: %d\n", length(sig_in_bulk)))
 
 mat <- expr_bulk[sig_in_bulk, , drop=FALSE]
 mat_z <- t(scale(t(mat)))
@@ -1169,7 +1173,7 @@ score_df <- data.frame(Sample = names(sig_score),
                        Group = group_factor)
 
 wt <- wilcox.test(Score ~ Group, data = score_df)
-cat("\n>>> ACKR1+ EC signature 评分 IPH vs non-IPH:\n")
+cat("\nACKR1-positive endothelial signature score: IPH vs non-IPH.\n")
 print(score_df %>% group_by(Group) %>%
         summarise(mean=round(mean(Score),3), median=round(median(Score),3), n=n()))
 cat(sprintf("    Wilcoxon P = %.3g\n", wt$p.value))
@@ -1185,12 +1189,12 @@ for(g in sig_in_bulk){
   if(!is.na(lfc) && lfc > 0) up_count <- up_count + 1
   test_tab <- rbind(test_tab, data.frame(gene=g, bulk_diff=round(lfc,3), p=signif(p,3)))
 }
-cat(sprintf("\n>>> %d 个可检测特征基因中, 在 IPH 组表达更高(上调)的有 %d 个 (%.0f%%)\n",
+cat(sprintf("\nOf %d detectable signature genes, %d (%.0f%%) have higher expression in IPH.\n",
             length(sig_in_bulk), up_count, 100*up_count/length(sig_in_bulk)))
 n_sig_up <- sum(test_tab$bulk_diff>0 & test_tab$p<0.05, na.rm=TRUE)
-cat(sprintf("    其中显著上调(P<0.05)的: %d 个\n", n_sig_up))
+cat(sprintf("Of these, %d have nominal P<0.05.\n", n_sig_up))
 
-cat("\n>>> 在 bulk IPH 组上调最明显的特征基因(前15):\n")
+cat("\nTop 15 signature genes upregulated in bulk IPH:\n")
 print(head(test_tab %>% arrange(desc(bulk_diff)), 15), row.names=FALSE)
 
 write.csv(test_tab, "ACKR1EC_signature_in_bulk_IPH.csv", row.names=FALSE)
@@ -1222,7 +1226,7 @@ work_dir <- "PATH_TO_DATA/ACKR1_single_cell"
 out_dir  <- file.path(work_dir, "06_CellChat_Communication")
 setwd(work_dir)
 
-message(">>> 1. 正在加载全局单细胞数据以分离 C4...")
+message("Loading integrated single-cell data to isolate C4.")
 sc_global <- readRDS("Plaque_Integrated_Unannotated.rds")
 
 cell_type_mapping <- c(
@@ -1249,7 +1253,7 @@ cell_type_mapping <- c(
 sc_global$FineCellType <- as.character(cell_type_mapping[as.character(sc_global$seurat_clusters)])
 Idents(sc_global) <- "FineCellType"
 
-message(">>> 2. 正在开启高灵敏度模式计算细胞通讯网络...")
+message("Estimating the targeted communication network.")
 data.input <- GetAssayData(sc_global, assay = "RNA", slot = "data")
 meta <- sc_global@meta.data
 
@@ -1267,9 +1271,9 @@ cc_targeted <- filterCommunication(cc_targeted, min.cells = 5)
 cc_targeted <- computeCommunProbPathway(cc_targeted)
 cc_targeted <- aggregateNet(cc_targeted)
 
-message(">>> 当前高灵敏度网络中捕捉到的通路有：")
+message("Detected pathways:")
 print(cc_targeted@netP$pathways)
-message(">>> 3. 正在绘制 1V1 靶向气泡图...")
+message("Plotting targeted ligand-receptor signals.")
 
 p_bubble_1v1 <- netVisual_bubble(cc_targeted, 
                                  sources.use = "ACKR1+ ECs", 
@@ -1281,3 +1285,985 @@ p_bubble_1v1 <- netVisual_bubble(cc_targeted,
 
 ggsave(file.path(out_dir, "04_Targeted_Bubble_C11_to_C4.pdf"), p_bubble_1v1, width = 5, height = 7)
 ggsave(file.path(out_dir, "04_Targeted_Bubble_C11_to_C4.png"), p_bubble_1v1, width = 5, height = 7, dpi = 600)
+
+# Supplementary Figure 7A-C
+
+message("\n>>> [Step 0] Loading dependencies ...")
+
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+if (!requireNamespace("hugene10sttranscriptcluster.db", quietly = TRUE)) {
+  BiocManager::install("hugene10sttranscriptcluster.db", update = FALSE, ask = FALSE)
+}
+if (!requireNamespace("GEOquery", quietly = TRUE)) {
+  BiocManager::install("GEOquery", update = FALSE, ask = FALSE)
+}
+for (p in c("tidyverse", "survival", "pROC", "lme4", "ggplot2", "patchwork")) {
+  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+}
+has_MuMIn <- requireNamespace("MuMIn", quietly = TRUE)
+
+suppressMessages({
+  library(GEOquery)
+  library(tidyverse)
+  library(hugene10sttranscriptcluster.db)
+  library(survival)
+  library(pROC)
+  library(lme4)
+  library(ggplot2)
+  library(patchwork)
+})
+
+select <- dplyr::select
+filter <- dplyr::filter
+rename <- dplyr::rename
+count  <- dplyr::count
+slice  <- dplyr::slice
+
+set.seed(20250101)
+B_BOOT <- 2000          
+
+work_dir  <- "PATH_TO_DATA/ACKR1_single_cell"
+out_dir   <- file.path(work_dir, "33_GSE43292_Paired_Confounding")
+setwd(work_dir)
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+file_path <- "GSE43292_series_matrix.txt"
+if (!file.exists(file_path)) stop("GSE43292_series_matrix.txt was not found in the working directory.")
+
+message(">>> [Step 1] Reading GSE43292 and resolving matched pairs ...")
+
+gset <- getGEO(filename = file_path, getGPL = FALSE)
+ph   <- pData(gset)
+
+get_patient <- function(ph) {
+  cand <- grep("^patient", tolower(colnames(ph)), value = TRUE)
+  if (length(cand) > 0) {
+    v <- as.character(ph[[cand[1]]])
+    if (all(!is.na(v)) && length(unique(v)) > 1) {
+      return(sprintf("P%02d", as.integer(gsub("\\D", "", v))))
+    }
+  }
+  v <- sub("^\\s*Patient\\s*([0-9]+).*$", "\\1", as.character(ph$title), ignore.case = TRUE)
+  sprintf("P%02d", as.integer(v))
+}
+patient_id <- get_patient(ph)
+stopifnot(!anyNA(patient_id), !any(patient_id == "PNA"))
+patient_id <- sprintf("Patient_XXXX%02d", match(patient_id, sort(unique(patient_id))))
+
+titles     <- as.character(ph$title)
+group_info <- ifelse(grepl("atheroma|plaque", titles, ignore.case = TRUE),
+                     "Stage IV-V (Advanced)", "Stage I-II (Early)")
+
+message("Tissue group counts:");            print(table(group_info))
+message("Number of samples per patient:");      print(table(table(patient_id)))
+
+pair_tab <- table(patient_id, group_info)
+complete_pairs <- rownames(pair_tab)[rowSums(pair_tab > 0) == 2 & rowSums(pair_tab) == 2]
+message(sprintf("Complete pairs: %d / %d", length(complete_pairs), nrow(pair_tab)))
+if (length(complete_pairs) < 2) stop("Pairing failed; check patient_id and group_info.")
+
+message(">>> [Step 2] Mapping probes and applying the locked model ...")
+
+probe_to_symbol <- mapIds(hugene10sttranscriptcluster.db,
+                          keys = rownames(exprs(gset)),
+                          column = "SYMBOL", keytype = "PROBEID",
+                          multiVals = "first")
+expr_df <- as.data.frame(exprs(gset))
+expr_df$Gene <- probe_to_symbol
+
+expr_clean <- expr_df %>%
+  dplyr::filter(!is.na(Gene) & Gene != "") %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::summarise(dplyr::across(dplyr::everything(), mean), .groups = "drop") %>%
+  as.data.frame()
+rownames(expr_clean) <- expr_clean$Gene
+mat_final <- as.matrix(expr_clean[, -1])
+message(sprintf("Gene matrix: %d genes x %d samples",
+                nrow(mat_final), ncol(mat_final)))
+
+cal_z_score <- function(x) {
+  s <- sd(x, na.rm = TRUE)
+  if (is.na(s) || s == 0) return(rep(0, length(x)))
+  (x - mean(x, na.rm = TRUE)) / s
+}
+mat_z <- t(apply(mat_final, 1, cal_z_score))
+
+t_cell_genes <- intersect(c("CD8A", "CD8B", "GZMA", "GZMB", "PRF1"), rownames(mat_z))
+cd8_score <- if (length(t_cell_genes) > 0) {
+  v <- colMeans(mat_z[t_cell_genes, , drop = FALSE], na.rm = TRUE)
+  v[is.nan(v) | is.na(v)] <- 0; v
+} else rep(0, ncol(mat_z))
+message(sprintf("Genes used for CD8_Tox: %s", paste(t_cell_genes, collapse = ", ")))
+
+safe_z <- function(g) {
+  if (g %in% rownames(mat_z)) {
+    v <- mat_z[g, ]; v[is.nan(v) | is.na(v)] <- 0; v
+  } else {
+    warning(sprintf("Gene %s was not detected; using zero.", g)); rep(0, ncol(mat_z))
+  }
+}
+
+dat <- data.frame(
+  Sample    = colnames(mat_final),
+  Patient   = patient_id,
+  Tissue    = factor(group_info, levels = c("Stage I-II (Early)", "Stage IV-V (Advanced)")),
+  Status    = as.integer(group_info == "Stage IV-V (Advanced)"),
+  SLC16A4_Z = safe_z("SLC16A4"),
+  SLC16A3_Z = safe_z("SLC16A3"),
+  ACKR1_Z   = safe_z("ACKR1"),
+  CD8_Tox_Z = cd8_score,
+  stringsAsFactors = FALSE
+)
+
+COEF <- c(intercept = 0.4625, SLC16A4_Z = -2.6931, SLC16A3_Z = 0.6481,
+          ACKR1_Z = 0.2556, CD8_Tox_Z = 0.7414)
+dat$Logit_P <- COEF["intercept"] +
+  COEF["SLC16A4_Z"] * dat$SLC16A4_Z + COEF["SLC16A3_Z"] * dat$SLC16A3_Z +
+  COEF["ACKR1_Z"]   * dat$ACKR1_Z   + COEF["CD8_Tox_Z"] * dat$CD8_Tox_Z
+dat$Prob <- 1 / (1 + exp(-dat$Logit_P))
+
+dat <- dat %>% dplyr::filter(Patient %in% complete_pairs)
+n_pair <- length(unique(dat$Patient))
+
+sd_lp <- sd(dat$Logit_P, na.rm = TRUE)
+dat$Logit_P_sd <- dat$Logit_P / sd_lp
+
+FEATS <- c("SLC16A4_Z", "SLC16A3_Z", "ACKR1_Z", "CD8_Tox_Z")
+PLQ <- "Stage IV-V (Advanced)"; NRM <- "Stage I-II (Early)"
+
+message(">>> [Step 3] Unstratified AUC and cluster bootstrap CI ...")
+
+roc_all   <- roc(dat$Status, dat$Prob, levels = c(0, 1), direction = "<", quiet = TRUE)
+auc_naive <- as.numeric(roc_all$auc)
+ci_naive  <- as.numeric(ci.auc(roc_all))
+
+pts <- unique(dat$Patient)
+boot_auc <- replicate(B_BOOT, {
+  s   <- sample(pts, length(pts), replace = TRUE)
+  idx <- unlist(lapply(s, function(p) which(dat$Patient == p)))
+  d   <- dat[idx, ]
+  if (length(unique(d$Status)) < 2) return(NA_real_)
+  as.numeric(roc(d$Status, d$Prob, levels = c(0, 1),
+                 direction = "<", quiet = TRUE)$auc)
+})
+ci_boot <- quantile(boot_auc, c(.025, .975), na.rm = TRUE)
+
+message(sprintf("AUC = %.3f | Naive CI %.3f-%.3f | Cluster bootstrap CI %.3f-%.3f",
+                auc_naive, ci_naive[1], ci_naive[3], ci_boot[1], ci_boot[2]))
+
+message(">>> [Step 4] Within-patient paired analysis ...")
+
+wide <- dat %>%
+  dplyr::select(Patient, Tissue, Logit_P, Prob, dplyr::all_of(FEATS)) %>%
+  tidyr::pivot_wider(names_from = Tissue,
+                     values_from = c(Logit_P, Prob, dplyr::all_of(FEATS)),
+                     names_sep = "__")
+wide$diff_logit <- wide[[paste0("Logit_P__", PLQ)]] - wide[[paste0("Logit_P__", NRM)]]
+
+n_conc <- sum(wide$diff_logit > 0, na.rm = TRUE)
+n_tie  <- sum(wide$diff_logit == 0, na.rm = TRUE)
+conc_rate <- (n_conc + 0.5 * n_tie) / n_pair
+bt <- binom.test(n_conc, n_pair, p = 0.5)
+
+boot_conc <- replicate(B_BOOT, {
+  s <- sample(pts, length(pts), replace = TRUE)
+  d <- wide$diff_logit[match(s, wide$Patient)]
+  mean(d > 0, na.rm = TRUE)
+})
+ci_conc <- quantile(boot_conc, c(.025, .975), na.rm = TRUE)
+
+wil <- wilcox.test(wide[[paste0("Logit_P__", PLQ)]],
+                   wide[[paste0("Logit_P__", NRM)]], paired = TRUE, exact = FALSE)
+tt  <- t.test(wide[[paste0("Logit_P__", PLQ)]],
+              wide[[paste0("Logit_P__", NRM)]], paired = TRUE)
+
+message(sprintf("Concordance %d/%d (%.1f%%) | Binomial P=%.4g | Bootstrap CI %.3f-%.3f",
+                n_conc, n_pair, 100 * conc_rate, bt$p.value, ci_conc[1], ci_conc[2]))
+message(sprintf("Paired Wilcoxon P=%.4g | Paired t-test mean difference=%.3f (%.3f, %.3f) P=%.4g",
+                wil$p.value, tt$estimate, tt$conf.int[1], tt$conf.int[2], tt$p.value))
+
+message(">>> [Step 5] Stratified and unstratified effects ...")
+
+fit_clogit <- clogit(Status ~ Logit_P_sd + strata(Patient), data = dat)
+s_cl <- summary(fit_clogit)
+or_strat <- c(s_cl$conf.int[1, "exp(coef)"],
+              s_cl$conf.int[1, "lower .95"],
+              s_cl$conf.int[1, "upper .95"])
+p_strat  <- s_cl$coefficients[1, "Pr(>|z|)"]
+
+fit_glm <- glm(Status ~ Logit_P_sd, data = dat, family = binomial())
+or_unstrat <- exp(c(coef(fit_glm)[2], confint.default(fit_glm)[2, ]))
+
+message(sprintf("Stratified OR=%.3f (%.3f-%.3f), P=%.4g",
+                or_strat[1], or_strat[2], or_strat[3], p_strat))
+message(sprintf("Unstratified OR=%.3f (%.3f-%.3f)",
+                or_unstrat[1], or_unstrat[2], or_unstrat[3]))
+message(sprintf("Stratified/unstratified effect ratio = %.2f",
+                or_strat[1] / or_unstrat[1]))
+
+message(">>> [Step 6] Per-feature paired analysis ...")
+
+feat_res <- lapply(FEATS, function(f) {
+  a <- wide[[paste0(f, "__", PLQ)]]; b <- wide[[paste0(f, "__", NRM)]]
+  d <- a - b
+  w  <- wilcox.test(a, b, paired = TRUE, exact = FALSE)
+  cl <- clogit(as.formula(paste0("Status ~ ", f, " + strata(Patient)")), data = dat)
+  scl <- summary(cl)
+  data.frame(
+    Feature      = f,
+    Locked_coef  = as.numeric(COEF[f]),
+    Mean_diff    = mean(d, na.rm = TRUE),
+    N_concordant = sum(d > 0, na.rm = TRUE),
+    N_pairs      = n_pair,
+    Concordance  = sprintf("%d/%d", sum(d > 0, na.rm = TRUE), n_pair),
+    Paired_Wilcox_P = w$p.value,
+    OR_clogit    = scl$conf.int[1, "exp(coef)"],
+    OR_low       = scl$conf.int[1, "lower .95"],
+    OR_high      = scl$conf.int[1, "upper .95"],
+    clogit_P     = scl$coefficients[1, "Pr(>|z|)"],
+    stringsAsFactors = FALSE
+  )
+}) %>% dplyr::bind_rows()
+feat_res$Wilcox_FDR <- p.adjust(feat_res$Paired_Wilcox_P, method = "BH")
+feat_res$clogit_FDR <- p.adjust(feat_res$clogit_P, method = "BH")
+print(feat_res, digits = 3)
+
+message(">>> [Step 7] Mixed-effects variance decomposition ...")
+
+m_lmm <- lmer(Logit_P ~ Tissue + (1 | Patient), data = dat,
+              REML = TRUE, control = lmerControl(check.conv.singular = "ignore"))
+vc <- as.data.frame(VarCorr(m_lmm))
+v_pt  <- vc$vcov[vc$grp == "Patient"]
+v_res <- vc$vcov[vc$grp == "Residual"]
+icc   <- v_pt / (v_pt + v_res)
+
+deff  <- 1 + (2 - 1) * icc
+n_eff <- nrow(dat) / deff
+
+r2 <- tryCatch(if (has_MuMIn) MuMIn::r.squaredGLMM(m_lmm) else NULL,
+               error = function(e) NULL)
+
+message(sprintf("Between-patient variance=%.4f | Residual variance=%.4f | ICC conditional on tissue=%.4f",
+                v_pt, v_res, icc))
+message(sprintf("Design effect=%.3f | Effective sample size=%.1f (observed %d)", deff, n_eff, nrow(dat)))
+if (!is.null(r2)) { message("Marginal/conditional R-squared:"); print(r2) }
+if (isSingular(m_lmm, tol = 1e-5)) {
+  message("Singular fit: the between-patient variance is a boundary estimate (approximately zero).")
+}
+
+message(">>> [Step 8] Plotting ...")
+
+theme_np <- function() {
+  theme_classic() +
+    theme(text = element_text(color = "black", family = "sans"),
+          axis.text  = element_text(size = 11, color = "black", face = "bold"),
+          axis.title = element_text(size = 12.5, face = "bold", color = "black"),
+          axis.line  = element_line(linewidth = 1.1, color = "black"),
+          axis.ticks = element_line(linewidth = 1.1, color = "black"),
+          plot.title = element_text(size = 13.5, face = "bold", hjust = .5),
+          plot.subtitle = element_text(size = 10.5, color = "grey30", hjust = .5))
+}
+COL <- c("#4C72B0", "#C44E52")
+
+# Supplementary Figure 7A
+p1 <- ggplot(dat, aes(x = Tissue, y = Logit_P)) +
+  geom_line(aes(group = Patient), color = "grey65", linewidth = .5, alpha = .85) +
+  geom_point(aes(color = Tissue), size = 2.6, alpha = .9) +
+  stat_summary(fun = median, geom = "crossbar", width = .35,
+               linewidth = .7, color = "black") +
+  scale_color_manual(values = COL) +
+  scale_x_discrete(labels = c("Macroscopically\nintact (Stary I-II)",
+                              "Atheroma plaque\n(Stary IV-V)")) +
+  labs(title = "Within-patient paired comparison",
+       subtitle = sprintf("GSE43292 | %d matched pairs | concordance %d/%d | paired Wilcoxon P = %s",
+                          n_pair, n_conc, n_pair, format.pval(wil$p.value, digits = 3)),
+       x = NULL, y = "Locked signature score (linear predictor)") +
+  theme_np() + theme(legend.position = "none")
+
+wd <- wide %>% dplyr::arrange(diff_logit) %>%
+  dplyr::mutate(Patient = factor(Patient, levels = Patient))
+# Supplementary Figure 7B
+p2 <- ggplot(wd, aes(x = Patient, y = diff_logit, fill = diff_logit > 0)) +
+  geom_col(width = .75) +
+  geom_hline(yintercept = 0, linewidth = .9) +
+  scale_fill_manual(values = c("TRUE" = COL[2], "FALSE" = COL[1])) +
+  labs(title = "Within-patient difference in signature score",
+       subtitle = "Plaque minus paired intact tissue from the SAME patient",
+       x = "Patient (sorted)", y = "\u0394 score (plaque - intact)") +
+  theme_np() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = .5, size = 7.5))
+
+fp <- feat_res %>%
+  dplyr::mutate(Feature = factor(Feature, levels = rev(FEATS)),
+                Sig = ifelse(clogit_P < 0.05, "P < 0.05", "n.s."))
+# Supplementary Figure 7C
+p3 <- ggplot(fp, aes(x = OR_clogit, y = Feature, color = Sig)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "grey40", linewidth = .8) +
+  geom_errorbarh(aes(xmin = OR_low, xmax = OR_high), height = .18, linewidth = .9) +
+  geom_point(size = 3.2) +
+  scale_x_log10() +
+  scale_color_manual(values = c("P < 0.05" = COL[2], "n.s." = "grey55")) +
+  labs(title = "Per-feature within-patient effect",
+       subtitle = "Conditional logistic regression, stratified by patient",
+       x = "Odds ratio (log scale, 95% CI)", y = NULL) +
+  theme_np() + theme(legend.title = element_blank(),
+                     legend.position = "bottom")
+
+p_comb <- (p1 | p2) / p3 + patchwork::plot_layout(heights = c(1, .8))
+ggsave(file.path(out_dir, "GSE43292_paired_analysis.pdf"), p_comb, width = 13, height = 10)
+ggsave(file.path(out_dir, "GSE43292_paired_analysis.png"), p_comb, width = 13, height = 10, dpi = 300)
+
+# Supplementary Figure 7D-E, G
+
+suppressMessages({
+  library(tidyverse); library(readxl); library(limma); library(stringr)
+  library(org.Hs.eg.db); library(AnnotationDbi); library(clusterProfiler)
+  library(ggplot2); library(patchwork)
+})
+select <- dplyr::select; filter <- dplyr::filter
+set.seed(20250101)
+
+work_dir <- "PATH_TO_DATA/ACKR1_single_cell"; setwd(work_dir)
+out_dir <- file.path(work_dir, "36_Proteome_Adjust_ReplicaOf03")
+fig_dir <- file.path(out_dir, "figures")
+if (!dir.exists(fig_dir)) dir.create(fig_dir, recursive = TRUE)
+
+target_file <- "稳定-不稳定-合并-差异蛋白-调整后.csv"
+clin_file   <- "统计用表-稳定-不稳定.xlsx"
+
+raw_lines    <- read.csv(target_file, header = FALSE, nrows = 5)
+sample_names <- sprintf("Sample_XXXX%02d", seq_len(ncol(raw_lines) - 1L))
+raw_labels   <- as.character(raw_lines[2, -1])
+
+data_df      <- read.csv(target_file, skip = 2, header = FALSE)
+protein_ids  <- data_df[, 1]
+expr_mat_raw <- as.matrix(data_df[, -1]); class(expr_mat_raw) <- "numeric"
+
+min_val <- min(expr_mat_raw[expr_mat_raw > 0], na.rm = TRUE)
+expr_mat_raw[is.na(expr_mat_raw) | expr_mat_raw == 0] <- min_val / 2
+norm_mat <- log2(expr_mat_raw)                       
+colnames(norm_mat) <- sample_names
+rownames(norm_mat) <- protein_ids
+
+final_group <- rep(NA, length(raw_labels))
+final_group[raw_labels == "A"] <- "Stable"
+final_group[raw_labels == "B"] <- "Unstable"
+group_factor <- factor(final_group, levels = c("Stable", "Unstable"))
+
+design   <- model.matrix(~ 0 + group_factor)
+colnames(design) <- c("Stable", "Unstable")
+contrast <- makeContrasts(Unstable_vs_Stable = Unstable - Stable, levels = design)
+fit2     <- eBayes(contrasts.fit(lmFit(norm_mat, design), contrast))
+deg_un   <- topTable(fit2, coef = 1, number = Inf, sort.by = "none")
+deg_un$Uniprot <- rownames(deg_un)
+deg_un$CleanID <- deg_un$Uniprot %>% str_split(";") %>% sapply(`[`, 1) %>%
+  str_split("-") %>% sapply(`[`, 1)
+deg_un$SYMBOL <- suppressMessages(
+  AnnotationDbi::mapIds(org.Hs.eg.db, keys = deg_un$CleanID,
+                        column = "SYMBOL", keytype = "UNIPROT", multiVals = "first"))
+deg_un$ENTREZID <- suppressMessages(
+  AnnotationDbi::mapIds(org.Hs.eg.db, keys = deg_un$CleanID,
+                        column = "ENTREZID", keytype = "UNIPROT", multiVals = "first"))
+
+check <- c("ALDOB", "PKM", "PGD", "TALDO1", "G6PD", "TKT", "ALDOA", "SLC16A3")
+repro <- deg_un %>% filter(SYMBOL %in% check) %>%
+  select(SYMBOL, Uniprot, logFC, P.Value, adj.P.Val, AveExpr) %>%
+  arrange(SYMBOL, P.Value)
+message("\nUnadjusted key-protein results:")
+print(repro, row.names = FALSE)
+message("Multiple accessions for a gene are listed separately.")
+write.csv(repro, file.path(out_dir, "01_REPRO_key_proteins_unadjusted.csv"), row.names = FALSE)
+
+clin_st <- read_excel(clin_file, sheet = "Stable")     %>% as.data.frame()
+clin_ns <- read_excel(clin_file, sheet = "Non-stable") %>% as.data.frame()
+lab_st  <- read_excel(clin_file, sheet = "Stable-化验")     %>% as.data.frame()
+lab_ns  <- read_excel(clin_file, sheet = "Non-stable-化验") %>% as.data.frame()
+
+std_clin <- function(cl, lb) {
+  side <- cl[["手术侧（1左，2右）"]]
+  Lg <- cl[[grep("^左侧颈动脉狭窄程度", names(cl))[1]]]
+  Rg <- cl[[grep("^右侧颈动脉狭窄程度", names(cl))[1]]]
+  raw_sten <- as.numeric(ifelse(side == 1, Lg, Rg))
+  out <- data.frame(
+    age = as.numeric(cl[["年龄"]]),      male  = as.integer(cl[["性别1男0女"]]),
+    htn = as.integer(cl[["高血压"]]),    dm    = as.integer(cl[["糖尿病"]]),
+    hlp = as.integer(cl[["高脂血症"]]),  cad   = as.integer(cl[["冠心病"]]),
+    smoke = as.integer(cl[["吸烟"]]),
+    stroke_hx = as.integer(cl[[grep("^脑梗史", names(cl))[1]]]),
+    sten_severe = as.integer(raw_sten >= 2))
+  for (v in c("LDL-C", "HDL-C", "TG", "CRP/hsCRP", "Glu"))
+    out[[make.names(v)]] <- suppressWarnings(as.numeric(lb[[v]]))
+  out
+}
+idx_A <- which(raw_labels == "A"); idx_B <- which(raw_labels == "B")
+stopifnot(length(idx_A) == nrow(clin_st), length(idx_B) == nrow(clin_ns),
+          nrow(lab_st) == nrow(clin_st), nrow(lab_ns) == nrow(clin_ns))
+cc_all <- bind_rows(std_clin(clin_st, lab_st), std_clin(clin_ns, lab_ns))
+
+ord <- c(idx_A, idx_B)
+mat <- norm_mat[, ord]
+yv  <- factor(c(rep("Stable", length(idx_A)), rep("Unstable", length(idx_B))),
+              levels = c("Stable", "Unstable"))
+for (j in names(cc_all)) cc_all[[j]][is.na(cc_all[[j]])] <- median(cc_all[[j]], na.rm = TRUE)
+
+cov_use <- names(cc_all)
+d_adj <- model.matrix(as.formula(paste("~ yv +", paste(cov_use, collapse = " + "))),
+                      data = data.frame(yv = yv, cc_all, check.names = FALSE))
+stopifnot(nrow(d_adj) == ncol(mat))
+deg_adj <- topTable(eBayes(lmFit(mat, d_adj)), coef = 2, number = Inf, sort.by = "none")
+
+cmp <- data.frame(
+  Uniprot = rownames(norm_mat), SYMBOL = deg_un$SYMBOL, ENTREZID = deg_un$ENTREZID,
+  logFC_unadj = deg_un$logFC, P_unadj = deg_un$P.Value, FDR_unadj = deg_un$adj.P.Val,
+  logFC_adj = deg_adj[rownames(norm_mat), "logFC"],
+  P_adj = deg_adj[rownames(norm_mat), "P.Value"],
+  FDR_adj = deg_adj[rownames(norm_mat), "adj.P.Val"])
+write.csv(cmp, file.path(out_dir, "02_DE_unadj_vs_adj_byAccession.csv"), row.names = FALSE)
+
+r_lfc <- cor(cmp$logFC_unadj, cmp$logFC_adj, use = "complete.obs")
+n_un  <- sum(cmp$P_unadj < 0.05, na.rm = TRUE)
+n_ad  <- sum(cmp$P_adj   < 0.05, na.rm = TRUE)
+ov    <- sum(cmp$P_unadj < 0.05 & cmp$P_adj < 0.05, na.rm = TRUE)
+
+key_tab <- cmp %>% filter(SYMBOL %in% check) %>%
+  select(SYMBOL, Uniprot, logFC_unadj, P_unadj, FDR_unadj, logFC_adj, P_adj, FDR_adj) %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 3))) %>% arrange(P_unadj)
+message("\nAdjusted and unadjusted key-protein results:")
+print(key_tab, row.names = FALSE)
+write.csv(key_tab, file.path(out_dir, "03_key_proteins_adj.csv"), row.names = FALSE)
+
+run_kegg_updown <- function(dd, pcol, fcol) {
+  sig <- dd %>% filter(.data[[pcol]] < 0.05, !is.na(ENTREZID))
+  up  <- sig %>% filter(.data[[fcol]] > 0) %>% pull(ENTREZID)
+  dn  <- sig %>% filter(.data[[fcol]] < 0) %>% pull(ENTREZID)
+  f <- function(g) {
+    if (length(g) < 10) return(data.frame())
+    k <- tryCatch(enrichKEGG(gene = g, organism = "hsa", pvalueCutoff = 0.05),
+                  error = function(e) NULL)
+    if (is.null(k) || nrow(as.data.frame(k)) == 0) return(data.frame())
+    as.data.frame(setReadable(k, OrgDb = org.Hs.eg.db, keyType = "ENTREZID"))
+  }
+  list(up = f(up), down = f(dn), n_up = length(up), n_dn = length(dn))
+}
+k_un  <- run_kegg_updown(cmp, "P_unadj", "logFC_unadj")
+k_adj <- run_kegg_updown(cmp, "P_adj",   "logFC_adj")
+for (nm in c("up", "down")) {
+  if (nrow(k_un[[nm]]))  write.csv(k_un[[nm]],  file.path(out_dir, sprintf("04_KEGG_unadj_%s.csv", nm)), row.names = FALSE)
+  if (nrow(k_adj[[nm]])) write.csv(k_adj[[nm]], file.path(out_dir, sprintf("05_KEGG_adj_%s.csv",  nm)), row.names = FALSE)
+}
+focus <- c("Pentose phosphate pathway", "Lipid and atherosclerosis",
+           "Glycolysis / Gluconeogenesis", "HIF-1 signaling pathway")
+grab <- function(df, p) { if (!nrow(df)) return(NA)
+  i <- which(df$Description == p); if (!length(i)) NA else signif(df$pvalue[i[1]], 3) }
+focus_tab <- data.frame(
+  Pathway = focus,
+  Unadj_up   = sapply(focus, grab, df = k_un$up),
+  Adj_up     = sapply(focus, grab, df = k_adj$up),
+  Unadj_down = sapply(focus, grab, df = k_un$down),
+  Adj_down   = sapply(focus, grab, df = k_adj$down))
+message("\nKEGG pathways by direction:")
+print(focus_tab, row.names = FALSE)
+write.csv(focus_tab, file.path(out_dir, "06_KEGG_focus.csv"), row.names = FALSE)
+
+pkg <- c("tidyverse", "glmnet", "pROC")
+for (p in pkg) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+suppressMessages({ library(tidyverse); library(glmnet); library(pROC) })
+
+work_dir <- "PATH_TO_DATA/ACKR1_single_cell"; setwd(work_dir)
+src_dir <- file.path(work_dir, "36_Proteome_Adjust_ReplicaOf03")
+out_dir <- file.path(work_dir, "39_SuppFig7_Panels")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+W <- 5.2; H <- 4.6                       
+COL_UN  <- "#272E6A"                     
+COL_ADJ <- "#D51F26"                     
+th <- theme_bw(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = c(0.98, 0.02), legend.justification = c(1, 0),
+        legend.background = element_rect(fill = alpha("white", .8), colour = NA),
+        legend.title = element_blank(),
+        plot.title = element_text(face = "bold", size = 12),
+        plot.subtitle = element_text(colour = "grey35", size = 9.5))
+
+# Supplementary Figure 7D
+f_key <- file.path(src_dir, "03_key_proteins_adj.csv")
+stopifnot(file.exists(f_key))
+key <- read.csv(f_key, check.names = FALSE)
+
+key_use <- key %>% group_by(SYMBOL) %>% slice_min(P_unadj, n = 1, with_ties = FALSE) %>%
+  ungroup() %>% arrange(P_unadj)
+
+dD <- key_use %>%
+  select(SYMBOL, logFC_unadj, `Unadjusted` = P_unadj, `Adjusted` = P_adj) %>%
+  pivot_longer(c(Unadjusted, Adjusted), names_to = "Model", values_to = "P") %>%
+  mutate(Model = factor(Model, levels = c("Unadjusted", "Adjusted")),
+         negLogP = -log10(P),
+         SYMBOL = factor(SYMBOL, levels = rev(key_use$SYMBOL)))
+
+pD <- ggplot(dD, aes(SYMBOL, negLogP, fill = Model)) +
+  geom_col(position = position_dodge(width = .72), width = .66) +
+  geom_hline(yintercept = -log10(0.05), linetype = 2, colour = "grey35") +
+  annotate("text", x = 0.7, y = -log10(0.05) + 0.45, label = "P = 0.05",
+           size = 3, colour = "grey35", hjust = 0) +
+  scale_fill_manual(values = c(Unadjusted = COL_UN, Adjusted = COL_ADJ)) +
+  scale_y_sqrt(expand = expansion(mult = c(0, .08))) +   
+  coord_flip() +
+  labs(x = NULL, y = expression(-log[10](italic(P))~", square-root scale"),
+       title = "Key proteins before vs after adjustment",
+       subtitle = "Internal proteomic cohort, n = 82; 14 clinical covariates") +
+  th
+ggsave(file.path(out_dir, "PanelD_key_proteins.pdf"), pD, width = W, height = H)
+ggsave(file.path(out_dir, "PanelD_key_proteins.png"), pD, width = W, height = H, dpi = 600)
+
+# Supplementary Figure 7E
+f_un  <- file.path(src_dir, "04_KEGG_unadj_up.csv")
+f_adj <- file.path(src_dir, "05_KEGG_adj_up.csv")
+stopifnot(file.exists(f_un), file.exists(f_adj))
+k_un  <- read.csv(f_un,  check.names = FALSE)
+k_adj <- read.csv(f_adj, check.names = FALSE)
+
+shared <- intersect(k_un$Description, k_adj$Description)
+message(sprintf("Shared significant up-regulated pathways: %d", length(shared)))
+
+must <- c("Pentose phosphate pathway", "Lipid and atherosclerosis")
+pick <- unique(c(intersect(must, shared),
+                 k_un %>% filter(Description %in% shared) %>%
+                   arrange(pvalue) %>% pull(Description)))
+pick <- head(pick, 10)
+
+dE <- bind_rows(
+  k_un  %>% filter(Description %in% pick) %>% transmute(Description, P = pvalue, Model = "Unadjusted"),
+  k_adj %>% filter(Description %in% pick) %>% transmute(Description, P = pvalue, Model = "Adjusted")) %>%
+  mutate(Model = factor(Model, levels = c("Unadjusted", "Adjusted")),
+         highlight = Description %in% must,
+         Description = factor(Description,
+                              levels = rev(k_un %>% filter(Description %in% pick) %>%
+                                             arrange(pvalue) %>% pull(Description))))
+
+pE <- ggplot(dE, aes(Description, -log10(P), fill = Model)) +
+  geom_col(position = position_dodge(width = .72), width = .66) +
+  geom_hline(yintercept = -log10(0.05), linetype = 2, colour = "grey35") +
+  scale_fill_manual(values = c(Unadjusted = COL_UN, Adjusted = COL_ADJ)) +
+  scale_y_continuous(expand = expansion(mult = c(0, .08))) +
+  coord_flip() +
+  labs(x = NULL, y = expression(-log[10](italic(P))),
+       title = "KEGG pathways, up-regulated set",
+       subtitle = sprintf("%d pathways shared before and after adjustment", length(shared))) +
+  th +
+  theme(axis.text.y = element_text(
+    face = ifelse(rev(levels(dE$Description)) %in% must, "bold", "plain")))
+ggsave(file.path(out_dir, "PanelE_KEGG.pdf"), pE, width = W, height = H)
+ggsave(file.path(out_dir, "PanelE_KEGG.png"), pE, width = W, height = H, dpi = 600)
+
+# Supplementary Figure 7F
+
+pkg_cran <- c("tidyverse", "glmnet", "pROC", "rms", "ResourceSelection")
+for (p in pkg_cran) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+pkg_bioc <- c("GEOquery", "illuminaHumanv2.db", "AnnotationDbi")
+for (p in pkg_bioc) {
+  if (!requireNamespace(p, quietly = TRUE)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+    BiocManager::install(p, update = FALSE, ask = FALSE)
+  }
+}
+suppressMessages({
+  library(tidyverse); library(glmnet); library(pROC); library(rms)
+  library(GEOquery);  library(illuminaHumanv2.db); library(AnnotationDbi)
+})
+select <- dplyr::select; filter <- dplyr::filter   
+
+work_dir <- "PATH_TO_DATA/ACKR1_single_cell"
+setwd(work_dir)
+out_dir <- file.path(work_dir, "37_Calibration_SlopeIntercept")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+set.seed(2024)
+
+message(">>> [1] Reading GSE163154 and rebuilding the model matrix ...")
+
+tox_genes <- c("CD8A", "CD8B", "GZMA", "GZMB", "PRF1")
+target_genes_base <- c("ACKR1", "CXCL12", "CXCR4", "HIF1A", "EP300",
+                       "HK2", "PKM", "LDHA", "PFKFB3", "ALDOB",
+                       "SLC16A3", "SLC16A7", "SLC16A4")
+
+target_gse <- "GSE163154_series_matrix.txt.gz"
+if (!file.exists(target_gse)) {
+  gset <- getGEO("GSE163154", destdir = ".", getGPL = FALSE)[[1]]
+} else {
+  gset <- getGEO(filename = target_gse, getGPL = FALSE)
+  if (is.list(gset)) gset <- gset[[1]]
+}
+expr_gse  <- exprs(gset)
+pheno_gse <- pData(gset)
+
+clinical_status <- ifelse(grepl("non-IPH", pheno_gse$title, ignore.case = TRUE),
+                          "non-IPH", "IPH")
+y_label <- factor(clinical_status, levels = c("non-IPH", "IPH"))
+y_num   <- as.integer(y_label == "IPH")
+
+probe_to_symbol <- suppressMessages(
+  AnnotationDbi::mapIds(illuminaHumanv2.db, keys = rownames(expr_gse),
+                        column = "SYMBOL", keytype = "PROBEID", multiVals = "first"))
+expr_df <- as.data.frame(expr_gse)
+expr_df$SYMBOL <- probe_to_symbol
+expr_clean <- expr_df %>% filter(!is.na(SYMBOL)) %>%
+  group_by(SYMBOL) %>% summarise_all(mean, na.rm = TRUE) %>% as.data.frame()
+rownames(expr_clean) <- expr_clean$SYMBOL
+expr_mat <- as.matrix(expr_clean[, -1])
+
+available_tox <- intersect(tox_genes, rownames(expr_mat))
+if (length(available_tox) > 0) {
+  tox_z_mat <- t(scale(t(expr_mat[available_tox, , drop = FALSE])))
+  expr_mat  <- rbind(expr_mat, "CD8_Tox_Score" = colMeans(tox_z_mat, na.rm = TRUE))
+}
+available_features <- intersect(c(target_genes_base, "CD8_Tox_Score"), rownames(expr_mat))
+X <- scale(t(expr_mat[available_features, ]))
+n <- nrow(X); p <- ncol(X)
+
+message(sprintf("N = %d (IPH %d / non-IPH %d); candidate features = %d",
+                n, sum(y_num == 1), sum(y_num == 0), p))
+stopifnot(n == length(y_num))
+
+EPS <- 1e-8
+to_lp <- function(pr) { pr <- pmin(pmax(pr, EPS), 1 - EPS); log(pr / (1 - pr)) }
+
+cal_metrics <- function(pr, y) {
+  lp <- to_lp(pr)
+  slope <- tryCatch(as.numeric(coef(glm(y ~ lp, family = binomial))[2]),
+                    error = function(e) NA_real_, warning = function(w) {
+                      suppressWarnings(as.numeric(coef(glm(y ~ lp, family = binomial))[2])) })
+  inter <- tryCatch(as.numeric(coef(glm(y ~ offset(lp), family = binomial))[1]),
+                    error = function(e) NA_real_, warning = function(w) {
+                      suppressWarnings(as.numeric(coef(glm(y ~ offset(lp), family = binomial))[1])) })
+  c(slope = slope, intercept = inter, brier = mean((pr - y)^2))
+}
+
+fit_lasso_inner <- function(Xtr, ytr) {
+  cvf <- cv.glmnet(Xtr, ytr, family = "binomial", alpha = 1,
+                   type.measure = "deviance", nfolds = min(10, length(ytr)))
+  lam <- cvf$lambda.min
+  fit <- glmnet(Xtr, ytr, family = "binomial", alpha = 1, lambda = lam)
+  list(predict_fun = function(Xnew)
+    as.numeric(predict(fit, newx = Xnew, type = "response", s = lam)),
+    selected = setdiff(rownames(coef(fit))[which(as.numeric(coef(fit)) != 0)],
+                       "(Intercept)"))
+}
+
+message(">>> [2] Nested LOOCV with LASSO selection repeated in each fold ...")
+
+nested_pred  <- numeric(n)
+feature_freq <- setNames(integer(p), colnames(X))
+for (i in seq_len(n)) {
+  inner <- fit_lasso_inner(X[-i, , drop = FALSE], y_num[-i])
+  nested_pred[i] <- inner$predict_fun(X[i, , drop = FALSE])
+  feature_freq[inner$selected] <- feature_freq[inner$selected] + 1L
+}
+roc_nested <- roc(y_num, nested_pred, quiet = TRUE, direction = "auto")
+ci_nested  <- ci.auc(roc_nested)
+message(sprintf("Nested LOOCV AUC = %.3f (95%% CI %.3f-%.3f)",
+                as.numeric(roc_nested$auc), ci_nested[1], ci_nested[3]))
+
+message(">>> [3] Nested LOOCV calibration ...")
+
+cal_nested <- cal_metrics(nested_pred, y_num)
+message(sprintf("Slope = %.3f; intercept = %.3f; Brier = %.3f",
+                cal_nested["slope"], cal_nested["intercept"], cal_nested["brier"]))
+
+bs <- replicate(2000, {
+  i <- sample(seq_len(n), n, replace = TRUE)
+  if (length(unique(y_num[i])) < 2) {
+    c(NA_real_, NA_real_)
+  } else {
+    suppressWarnings(cal_metrics(nested_pred[i], y_num[i])[c("slope", "intercept")])
+  }
+})
+ci_slope <- quantile(bs[1, ], c(.025, .975), na.rm = TRUE)
+ci_inter <- quantile(bs[2, ], c(.025, .975), na.rm = TRUE)
+message(sprintf("Slope 95%% CI %.3f-%.3f; intercept 95%% CI %.3f-%.3f",
+                ci_slope[1], ci_slope[2], ci_inter[1], ci_inter[2]))
+
+pkg <- c("tidyverse", "glmnet", "pROC", "rms", "logistf", "ResourceSelection")
+for (p in pkg) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+suppressMessages({
+  library(tidyverse); library(glmnet); library(pROC); library(rms); library(logistf)
+})
+
+work_dir <- "PATH_TO_DATA/ACKR1_single_cell"
+setwd(work_dir)
+out_dir <- file.path(work_dir, "38_Calibration_Robust")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+set.seed(2024)
+
+rebuild_env <- function() {
+  message(">>> Rebuilding missing model objects from GSE163154 ...")
+  suppressMessages({
+    library(GEOquery); library(illuminaHumanv2.db); library(AnnotationDbi)
+  })
+  tox_genes <- c("CD8A", "CD8B", "GZMA", "GZMB", "PRF1")
+  base_g <- c("ACKR1", "CXCL12", "CXCR4", "HIF1A", "EP300", "HK2", "PKM",
+              "LDHA", "PFKFB3", "ALDOB", "SLC16A3", "SLC16A7", "SLC16A4")
+  f <- "GSE163154_series_matrix.txt.gz"
+  gset <- if (file.exists(f)) { g <- getGEO(filename = f, getGPL = FALSE)
+  if (is.list(g)) g[[1]] else g
+  } else getGEO("GSE163154", destdir = ".", getGPL = FALSE)[[1]]
+  e <- exprs(gset); ph <- pData(gset)
+  yl <- factor(ifelse(grepl("non-IPH", ph$title, ignore.case = TRUE), "non-IPH", "IPH"),
+               levels = c("non-IPH", "IPH"))
+  sym <- suppressMessages(AnnotationDbi::mapIds(
+    illuminaHumanv2.db, keys = rownames(e), column = "SYMBOL",
+    keytype = "PROBEID", multiVals = "first"))
+  ed <- as.data.frame(e); ed$SYMBOL <- sym
+  ec <- ed %>% dplyr::filter(!is.na(SYMBOL)) %>% dplyr::group_by(SYMBOL) %>%
+    dplyr::summarise_all(mean, na.rm = TRUE) %>% as.data.frame()
+  rownames(ec) <- ec$SYMBOL
+  em <- as.matrix(ec[, -1])
+  tox <- intersect(tox_genes, rownames(em))
+  if (length(tox)) em <- rbind(em, CD8_Tox_Score =
+                                 colMeans(t(scale(t(em[tox, , drop = FALSE]))), na.rm = TRUE))
+  feats <- intersect(c(base_g, "CD8_Tox_Score"), rownames(em))
+  list(X = scale(t(em[feats, ])), y_num = as.integer(yl == "IPH"), expr_mat = em)
+}
+
+if (!all(sapply(c("X", "y_num", "nested_pred"), exists))) {
+  tmp <- rebuild_env()
+  X <- tmp$X; y_num <- tmp$y_num; expr_mat <- tmp$expr_mat
+  nested_pred <- NULL
+}
+n <- nrow(X)
+
+fit_lasso_inner <- function(Xtr, ytr) {
+  cvf <- cv.glmnet(Xtr, ytr, family = "binomial", alpha = 1,
+                   type.measure = "deviance", nfolds = min(10, length(ytr)))
+  lam <- cvf$lambda.min
+  fit <- glmnet(Xtr, ytr, family = "binomial", alpha = 1, lambda = lam)
+  list(predict_fun = function(Xn)
+    as.numeric(predict(fit, newx = Xn, type = "response", s = lam)))
+}
+
+if (is.null(nested_pred) || length(nested_pred) != n) {
+  message(">>> Re-running nested LOOCV ...")
+  nested_pred <- numeric(n)
+  for (i in seq_len(n))
+    nested_pred[i] <- fit_lasso_inner(X[-i, , drop = FALSE], y_num[-i])$predict_fun(X[i, , drop = FALSE])
+}
+
+EPS <- 1e-8
+to_lp <- function(pr) { pr <- pmin(pmax(pr, EPS), 1 - EPS); log(pr / (1 - pr)) }
+
+cal_robust <- function(pr, y) {
+  lp <- to_lp(pr)
+  sd_lp <- sd(lp)
+  if (!is.finite(sd_lp) || sd_lp < 1e-6 || length(unique(y)) < 2)
+    return(c(slope = NA, slope_firth = NA, intercept = NA, brier = NA, degenerate = 1))
+  
+  s_mle <- suppressWarnings(tryCatch(
+    as.numeric(coef(glm(y ~ lp, family = binomial))[2]), error = function(e) NA))
+  degen <- as.integer(!is.finite(s_mle) || abs(s_mle) > 25)
+  
+  s_fir <- suppressWarnings(tryCatch(
+    as.numeric(coef(logistf(y ~ lp, data = data.frame(y = y, lp = lp)))[2]),
+    error = function(e) NA))
+  inter <- suppressWarnings(tryCatch(
+    as.numeric(coef(glm(y ~ offset(lp), family = binomial))[1]), error = function(e) NA))
+  c(slope = s_mle, slope_firth = s_fir, intercept = inter,
+    brier = mean((pr - y)^2), degenerate = degen)
+}
+
+cal_n <- cal_robust(nested_pred, y_num)
+message(sprintf("Nested LOOCV: slope (MLE) = %.3f; slope (Firth) = %.3f; intercept = %.3f; Brier = %.3f",
+                cal_n["slope"], cal_n["slope_firth"], cal_n["intercept"], cal_n["brier"]))
+
+message(">>> [2] Bootstrap confidence intervals on the log scale ...")
+B1 <- 2000
+bs <- matrix(NA_real_, B1, 3, dimnames = list(NULL, c("firth", "inter", "degen")))
+for (b in seq_len(B1)) {
+  i <- sample(seq_len(n), n, replace = TRUE)
+  m <- cal_robust(nested_pred[i], y_num[i])
+  bs[b, ] <- m[c("slope_firth", "intercept", "degenerate")]
+}
+ok <- is.finite(bs[, "firth"]) & bs[, "firth"] > 0
+pct_degen <- 100 * mean(bs[, "degen"] == 1, na.rm = TRUE)
+ci95 <- exp(quantile(log(bs[ok, "firth"]), c(.025, .975), na.rm = TRUE))
+ci80 <- exp(quantile(log(bs[ok, "firth"]), c(.10,  .90),  na.rm = TRUE))
+ci_in <- quantile(bs[, "inter"], c(.025, .975), na.rm = TRUE)
+message(sprintf("Degenerate bootstrap resamples = %.1f%%", pct_degen))
+message(sprintf("Slope 95%% CI = %.3f - %.3f; 80%% CI = %.3f - %.3f",
+                ci95[1], ci95[2], ci80[1], ci80[2]))
+message(sprintf("Intercept 95%% CI = %.3f - %.3f", ci_in[1], ci_in[2]))
+
+out_dir <- file.path(work_dir, "39_SuppFig7_Panels")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+auc_n   <- as.numeric(roc(y_num, nested_pred, quiet = TRUE, direction = "auto")$auc)
+brier_n <- mean((nested_pred - y_num)^2)
+
+draw_F <- function() {
+  par(mar = c(4.6, 4.6, 3.4, 1.4), font.lab = 2, lwd = 1.4, cex.lab = 1.0)
+  plot(0, 0, type = "n", xlim = c(0, 1), ylim = c(0, 1),
+       xlab = "Predicted probability (nested LOOCV)", ylab = "Observed frequency")
+  title(main = "Calibration, leakage-free", font.main = 2, cex.main = 1.15, line = 2.0)
+  mtext("GSE163154, N = 43; LASSO selection repeated in every fold",
+        side = 3, line = 0.55, cex = 0.78, col = "grey35")
+  abline(0, 1, lty = 2, col = "grey55")
+  lo <- loess(y_num ~ nested_pred, span = 1)
+  xs <- seq(min(nested_pred), max(nested_pred), length.out = 200)
+  lines(xs, pmin(pmax(predict(lo, xs), 0), 1), col = COL_ADJ, lwd = 3)
+  rug(nested_pred[y_num == 1], side = 3, col = COL_ADJ, lwd = 1.1)
+  rug(nested_pred[y_num == 0], side = 1, col = COL_UN,  lwd = 1.1)
+  legend("topleft", bty = "n", cex = 0.86, text.font = 2,
+         legend = c(sprintf("Slope = %.3f (%.3f-%.3f)", cal_n["slope_firth"], ci95[1], ci95[2]),
+                    sprintf("Intercept = %.3f (%.3f-%.3f)", cal_n["intercept"], ci_in[1], ci_in[2]),
+                    sprintf("Brier (nested LOOCV) = %.3f", brier_n),
+                    sprintf("AUC = %.3f", auc_n)))
+}
+pdf(file.path(out_dir, "PanelF_calibration.pdf"), width = W, height = H); draw_F(); dev.off()
+png(file.path(out_dir, "PanelF_calibration.png"), width = W, height = H,
+    units = "in", res = 600); draw_F(); dev.off()
+
+# Supplementary Figure 7G
+
+p1 <- ggplot(cmp, aes(logFC_unadj, logFC_adj)) +
+  geom_point(alpha = .2, size = .8, colour = "grey45") +
+  geom_point(data = filter(cmp, SYMBOL %in% c("ALDOB", "PKM")), colour = "#D51F26", size = 2.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "logFC (unadjusted)", y = "logFC (adjusted for 14 clinical covariates)",
+       title = sprintf("Proteome-wide effect sizes, r = %.3f", r_lfc)) +
+  theme_bw(base_size = 12)
+ggsave(file.path(fig_dir, "Adjust_vs_Unadjust.pdf"), p1, width = 6.5, height = 6)
+ggsave(file.path(fig_dir, "Adjust_vs_Unadjust.png"), p1, width = 6.5, height = 6, dpi = 600)
+
+# Supplementary Figure 8A-B
+
+suppressMessages({
+  library(GEOquery); library(illuminaHumanv2.db); library(dplyr)
+  library(tidyr); library(ggplot2); library(ggpubr)
+})
+filter <- dplyr::filter; select <- dplyr::select; mutate <- dplyr::mutate
+
+work_dir <- "PATH_TO_DATA/ACKR1_single_cell"      
+setwd(work_dir)
+out_dir <- file.path(work_dir, "47_GSE163154_FeatureCompare")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+COL <- c("non-IPH" = "#272E6A", "IPH" = "#D51F26")
+
+target_gse <- "GSE163154_series_matrix.txt.gz"
+if (!file.exists(target_gse))
+  stop("File not found: ", target_gse, "\nPlace this file in work_dir or update the path.")
+
+message(">>> Reading GSE163154 ...")
+gset  <- getGEO(filename = target_gse, getGPL = FALSE)
+pheno <- pData(gset)
+
+is_non_iph  <- grepl("non-IPH", pheno$title, ignore.case = TRUE)
+group_gse   <- ifelse(is_non_iph, "non_IPH", "IPH")
+group_factor <- factor(group_gse, levels = c("non_IPH", "IPH"))
+n_non <- sum(group_factor == "non_IPH"); n_iph <- sum(group_factor == "IPH")
+message(sprintf("non-IPH = %d; IPH = %d", n_non, n_iph))
+
+message(">>> Mapping probes and aggregating genes ...")
+expr_probe <- exprs(gset)
+sym <- mapIds(illuminaHumanv2.db, keys = rownames(expr_probe),
+              column = "SYMBOL", keytype = "PROBEID", multiVals = "first")
+
+df <- as.data.frame(expr_probe)
+df$SYMBOL <- sym
+df <- df[!is.na(df$SYMBOL), ]
+expr_gene <- df %>% group_by(SYMBOL) %>% summarise_all(mean) %>% as.data.frame()
+rownames(expr_gene) <- expr_gene$SYMBOL
+expr_gene$SYMBOL <- NULL
+expr_gene <- as.matrix(expr_gene)
+message(sprintf("Gene matrix: %d genes x %d samples", nrow(expr_gene), ncol(expr_gene)))
+
+tox_genes <- c("CD8A", "CD8B", "GZMA", "GZMB", "PRF1")
+tox_hit <- intersect(tox_genes, rownames(expr_gene))
+message(sprintf("Cytotoxicity genes detected: %d/%d: %s",
+                length(tox_hit), length(tox_genes), paste(tox_hit, collapse = ", ")))
+
+z <- function(v) as.numeric(scale(as.numeric(v)))
+
+feat <- data.frame(
+  Sample = colnames(expr_gene),
+  Group  = factor(ifelse(group_factor == "IPH", "IPH", "non-IPH"),
+                  levels = c("non-IPH", "IPH")),
+  ACKR1   = z(expr_gene["ACKR1",   ]),
+  SLC16A3 = z(expr_gene["SLC16A3", ]),
+  SLC16A4 = z(expr_gene["SLC16A4", ]),
+  CD8_Tox_Score = z(colMeans(t(scale(t(expr_gene[tox_hit, , drop = FALSE]))))),
+  check.names = FALSE)
+
+tox_df <- as.data.frame(t(apply(expr_gene[tox_hit, , drop = FALSE], 1, z)))
+colnames(tox_df) <- colnames(expr_gene)
+tox_long <- data.frame(Sample = colnames(expr_gene), Group = feat$Group,
+                       t(tox_df), check.names = FALSE) %>%
+  pivot_longer(all_of(tox_hit), names_to = "Gene", values_to = "Z")
+tox_long$Gene <- factor(tox_long$Gene, levels = tox_hit)
+
+stat_one <- function(v, g, nm) {
+  a <- v[g == "non-IPH"]; b <- v[g == "IPH"]
+  w <- wilcox.test(b, a)
+  
+  d <- mean(sign(outer(b, a, "-")))
+  data.frame(Variable = nm,
+             median_nonIPH = round(median(a), 3), median_IPH = round(median(b), 3),
+             mean_nonIPH = round(mean(a), 3),   mean_IPH = round(mean(b), 3),
+             Wilcoxon_P = signif(w$p.value, 3),
+             Cliffs_delta = round(d, 3))
+}
+
+res <- do.call(rbind, c(
+  lapply(c("ACKR1","SLC16A3","SLC16A4","CD8_Tox_Score"),
+         function(nm) stat_one(feat[[nm]], feat$Group, nm)),
+  lapply(tox_hit, function(g)
+    stat_one(as.numeric(tox_df[g, ]), feat$Group, g))
+))
+res$P_BH <- signif(p.adjust(res$Wilcoxon_P, "BH"), 3)
+write.csv(res, file.path(out_dir, "01_feature_stats.csv"), row.names = FALSE)
+print(res, row.names = FALSE)
+
+main_long <- feat %>%
+  pivot_longer(c(ACKR1, SLC16A3, SLC16A4, CD8_Tox_Score),
+               names_to = "Variable", values_to = "Z")
+main_long$Variable <- factor(main_long$Variable,
+                             levels = c("ACKR1","SLC16A3","SLC16A4","CD8_Tox_Score"))
+
+# Supplementary Figure 8A
+p1 <- ggplot(main_long, aes(Group, Z, fill = Group)) +
+  geom_boxplot(width = .58, outlier.shape = NA, alpha = .9, linewidth = .4) +
+  geom_jitter(width = .16, size = 1.1, alpha = .55, colour = "grey25") +
+  facet_wrap(~ Variable, nrow = 1, scales = "free_y") +
+  scale_fill_manual(values = COL) +
+  stat_compare_means(method = "wilcox.test", label = "p.format",
+                     label.x = 1.3, size = 3.3) +
+  labs(x = NULL, y = "Standardised expression (Z-score)",
+       title = "Model features in the training cohort (GSE163154)",
+       subtitle = sprintf("non-IPH, n = %d; IPH, n = %d", n_non, n_iph)) +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none",
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold", size = 10.5),
+        axis.text = element_text(colour = "black"),
+        plot.title = element_text(face = "bold", size = 12.5),
+        plot.subtitle = element_text(colour = "grey35", size = 9))
+
+ggsave(file.path(out_dir, "02_feature_boxplot.pdf"), p1, width = 9.6, height = 4.2)
+ggsave(file.path(out_dir, "02_feature_boxplot.png"), p1, width = 9.6, height = 4.2, dpi = 600)
+
+# Supplementary Figure 8B
+p2 <- ggplot(tox_long, aes(Group, Z, fill = Group)) +
+  geom_boxplot(width = .58, outlier.shape = NA, alpha = .9, linewidth = .4) +
+  geom_jitter(width = .16, size = 1.1, alpha = .55, colour = "grey25") +
+  facet_wrap(~ Gene, nrow = 1) +
+  scale_fill_manual(values = COL) +
+  stat_compare_means(method = "wilcox.test", label = "p.format",
+                     label.x = 1.3, size = 3.2) +
+  labs(x = NULL, y = "Standardised expression (Z-score)",
+       title = "Cytotoxicity genes comprising the CD8_Tox_Score (GSE163154)") +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none", panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold.italic", size = 10),
+        axis.text = element_text(colour = "black"),
+        plot.title = element_text(face = "bold", size = 12))
+
+ggsave(file.path(out_dir, "03_CD8tox_genes.pdf"), p2, width = 11, height = 4)
+ggsave(file.path(out_dir, "03_CD8tox_genes.png"), p2, width = 11, height = 4, dpi = 600)
